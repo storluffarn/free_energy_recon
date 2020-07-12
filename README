@@ -1,0 +1,384 @@
+
+NOTE: A lot of the code in this project is attributed to Johan Sjögren with subsequent additions and modifications by me (David Andersson)
+
+General notes:
+
+	* the phrase "stopping criterion" is used in an non-consistant fashion in this 
+	  project that might lead to discrepancies, sometimes it is used as an actual
+	  stoping criterion, breaking some loop, but it is also used to refere to a 
+	  cut off, such that if x > y, x = 0.
+	* this document should probably be extended to the c-code...
+	* there's a lot of ambiguity floating around. Z_max and Z_min means one thing in
+	  the c-code, and another in the python code, and the same goes for traces.
+
+
+###########################
+### lucy_comparisons.py ###
+###########################
+
+** Caveats **
+
+This program is hard coded to only take integer inputs for the energy.
+
+** Descritption ** 
+
+This is the program that runs the image reconstruction. It plots a comparison of chosen LR-methods and WHAM.
+
+** List of variables **
+
+E:			barrier hight in units of kb_T
+runs:		
+Z:			
+T:			
+Z_min:		
+Z_max:		
+max_force:	static friction, or maximum force from the lattice force
+x_f			a matrix of positions of the test particle in the forward direction in 
+			multiple runs (called traces?).
+			~~ hmm, how does these traces compare to the ones on py_devonc.py
+traces:		number of trajectories?
+samples:	number samples per trajectory?
+LR_bins:	number of bins for Lucy-Richardson
+wham_bins:	number of bins for WHAM
+x_r			same as x_f but backward direction
+hstack:		makes a horizontally stacked list from x_f and x_r with row n being made up
+			of row n in x_f and row n in x_r.
+x:			~~ why is this hstacked?
+support:	support positions?
+ITER:		
+ITER_LOCAL:	
+slack:		
+max_force:	
+
+** List of functions **
+
+####################
+### py_deconv.py ###
+####################
+
+** Caveats ** 
+
+exp_works is indexed such that each new row is a new trace, however, x is opposite
+
+** Description **
+
+This is the program where
+
+** List of variables **
+
+z_min:				starting position of something? support or test particle?
+z_max:				ending position?
+d_bin:				width of a bin
+sigma:				latice constant
+support:			this is probably support position (double check main program)
+bins:				number of bins
+x:					
+traces:				number of trajectories
+samples:			number of poits in a trajectory
+bin_edges:			edges of bins
+bin_centers:		centers of bins
+extra_bins			extra bins on the sides of LR_deconv (why are they used?)
+lc_bins:			bins used in LR_deconv, it has size N
+dz:					the distance between two bins
+ext_work:			external work? only work by the spring force
+exp_average:		average of the exponential of the work in a trajectory,  
+					we need this for Jarzynski
+signal:				an array of binned averages of external works of the trajectories
+signal_counter:		counting instances in each bin in signal
+x_new:	
+range_tuple:					
+n_periods:			
+z:					
+S:					maxima, either summed or as a vector
+z:					a list of something ~~ free energy differences for some estimate O?
+t:					some sub list of z
+M:					length of signal
+N:					signal size + extra_bins on both sides
+V:					the biasing potential(?), which is the potential of the spring
+ITER:				number of iterations
+bin_diff:			distances between bins (aren't these all the same? and all dz?)
+range_tuple:
+f_m:
+n_periods:
+surface_force_max	
+
+
+** List of functions **
+
+get_signal			first sets up set of bins, then calculates the work done in each 
+					time step, in each trajectory, then averages the work in each 
+					timestep between the trajectories, then the averages are binned 
+					with respect to support position to create the signal matrix. 
+					Then there is some normalization that's not in use.
+g_sig_f_a_samp		full name get_signal_for_all_samples, first it makes a list of 
+					all support positions that lie in the scaled scanning interval,
+					then it makes a list of lists where each list is a list of the 
+					elements of x that corresponds to support positions in the 
+					same interval as in get_signal, for each of the trajectories
+surface_potential	this is the surface part of the tomlinson potential weighted
+					by a boltzmann factor to which the energy is an argument
+summed_maxima		for each lattice period findes the maximum of z, and adds upp all 
+					these maxumas
+maximum_vector		same as summed_maxima, but returns a vector rather than a sum
+					rather than a sum of all maximas
+make_pbc_kernel		~~ why is there a modulus? and why does does the exponent contain 
+					these perticular terms?
+make_kernel			builds an M*N matrix, in the terminology of LR_deconv, where the 
+					elements are tomlinson spring forces where each line moves the 
+					test particle one bin and each column moves the support position
+					by one bin, and the support position uses the extended grid
+get_P_sum			this function takes the bins, the extended bins and the kernel, 
+					it returns a vector where the each element is the row-wise sum 
+					of the kernal, that is, it adds up the extended bins, meaning, 
+					for each support position, we sum over up contribution from 
+					each test particle position
+set_constant		this functon takes a vector and returns the first element of the 
+					vector plus the surface potential in the first grid point
+LR_deconv			first defines a list of bins lc_bins, which is the same as
+					bin_centers, but padded on the ends with extra_bins bins placed 
+					dz apart, then makes a kernel according to make_kernel, then 
+					starts the LR iteration with starting guess O being a vector with 
+					all elements being the sum over all elements in signal, I 
+					assumed to be the kernal times O and the normalization used is
+					the P_norm from get_P_sum, it iterates ITER times, finally returns
+					an array of the free energies in each points except the first 
+					extra_bins, as well as these points
+LR_deconv_maxforce	similar to LR_deconv, but a list called bin_diff is introduced, 
+					this the position between any two bin_centers, which seems like
+					a very round about way of saying i times the bin width, ~~
+					the rest I don't get atm, need to find out what f_m and 
+					rangle_tuple is ~~ something with f_m
+LR_deconv_mf_pbc	full name is LR_deconv_maxforce_pbc, first runs make_pbc_kernel, 
+					then does LR_deconc stuff, then defines the surface_force_max
+					as the maximum free energy difference divided by the spacing for 
+					each adjacent element in O, then LR_deconv loops and updates
+					surface_force_max until ~~ something with f_m, aslo, this 
+					surface_force_max is weird, because it rather looks like an energy
+					but trusting the variable name it should be a force
+self_consistant_eq	~~ this is a simple function, but what is the significance of
+					the quotient?
+BAR_dF				This has to do with Bennet Acceptance Ratio, which calculates the
+					free energy difference between two systems ~~ but how?
+jarz_dF				
+get_signal_bi		similar to get_signal up to dF part, defines backward and forward 
+					versions of each quantity, then calculates the difference in free
+					between the forward and backward direction, then the exponentiated
+					forward, backwards, dissipative and total works are calculated,
+					the result is then binned and normalized as in the signal function
+					~~ I don't quite understand the work formulae
+remove_zeros		~~ used in wham
+wham				calculates the works in each timestep identically to get_signal. 
+					sum the jarz work over over all trajectories in every time step 
+					into the weights vector, like in get signal. then make a histogram
+					of these works by determining which bin the current test particle
+					position (x) corresponds to. then all weights are normalizd (could
+					be done earlier?). defines the biasing potential as exp beta of the 
+					spring potential. calculates a quitient in every bin which is 
+wham_bi				~~ I'm not prioritizing wham atm
+
+
+
+###################
+### py_utils.py ###
+###################
+
+** List of variables and aliases **
+
+cluster:				is a list of lists
+
+kb:						boltzmann's cosntant
+beta:					thermodynamic beta
+sigma:					the latice constant
+K:						the spring constant
+x:						seems to be both forces and positions of test particles
+s:				
+thresh:					some threshold spring force difference between two timesteps, 
+						used to determine if the derivative of the force is larger 
+						than some value, if it is, we assume that the test particle 
+						has slipped
+support:				support position
+force_trace:			the spring forces? (why is this a diagonal matrix?)
+s_list:					list of support positions at slippage
+x_list:					list of spring forces att slippage
+MAX_SPACING				maximum allowed dislocation between two timesteps, if the 
+						dislocation is larger than this we assume the test particle 
+						has slipped (why is it related to s[i] in the code? isn't 
+						that the support position?)
+last_pos				tracks the last postion of the support
+cluster_counter			sort of an iterator making new rows in first_in_cluster
+cluster_list			the list shown in first_in_cluster
+
+** List of functions **
+
+average_slip_force		calculates the spring force and the support position at the 
+						point of slipping
+average_slip_force2		calculates the average of the slip forces from averave_slip
+						_forces (what is the meaning of s_m here?)
+cluster_to_min			returns a list of all minimas in a list of lists
+first_in_cluster		seems to return a list of lists, on the form
+						xns, xns, ... , xsn
+						xs
+						xns, xns, ... , xsn
+						xs
+						where ns are forces when there have been no splips, and xs is 
+						the force after the slip
+get_first_slip_forces	returns the slip positions (of the support? check the main 
+						program to see what s and x is) and the spring forces
+
+
+
+##########################
+### From local_lucy.py ###
+##########################
+
+** Description **
+
+This is where the LR reconstruction alorithms are defined.
+
+** List of variables **
+
+force_scale:			a factor for seetting the force scale
+x:						
+x_max:					
+cut_rate:				
+O:						an intermediate image
+D:						the output from get_deriv_matrix
+P_norm					P-normalization, see py_deconv.py
+I:						the iterated image
+f_max:
+u_max:					
+f_m:					maximum lattice force times slack ~~ what's slack? cf
+						lucy_comparisons.py
+summed_f_m				total scanning length times f_m ~~ so maximum work?
+n_periods				this is the total scanning length, and probably number of 
+						lattice periods  ~~ is it inferred somewhere that the scanning
+						length is in units of latice periods?
+surface_force_max		the maximum difference in free energy between ant two steps
+
+** List of functions **
+
+cutoff_function:		~~ takes a list of the derivatives of the free energies along 
+						the diagonal, and returns 0 if it's under some critical value
+						and some value close to 1 otherwise, why this value though?
+get_deriv_matrix:		constructs a banded matrix with the elements -1,0,1 centered
+						on the diagonal ~~ but why? this is some sort of derivative?
+local_lucy:				very much like LR_deconv from py_deconv.py, but has a stopping
+						criterion, the LR loop definings a check variable which is 
+						cutoff_function taking the derivative of the currant free 
+						energy as input, O is then updated like in LR_deconv, with the
+						addition of a factor making the output small of the cutoff 
+						criterion is met, the output part is identicle to LR_deconv
+get_altered_I:			takes the present iterated I and the last one as well a list
+						check in which the elements are 0 or 1 depending on whether or
+						not they are larger than f_max, for each element in I, if the
+						corresponding check value is 1, the function sets the present
+						I value to the old I value in that point ~~ actually, the 
+						derivative of the free energy, not the force? Also, wouldn't
+						this introduce a lagging where some values are reverted, but
+						some aren't?
+local_lucy2:			same as LR_deconv, but get_altered_I is used as a cut off
+maxima_check:			similar to get_altered_I, this function calculates the free
+						energy in all points, then subtracts the free energy in the 
+						first point from all points, then finds the points where the 
+						energy is larger then some value u_max, and reverts the value 
+						of I in these points ~~ the free energy in the first point is 
+						some kind of zero level energy?
+local_lucy3:			same as LR_reconv, but maxima_check is used as a cut off
+lucy_summed_max:		an LR_deconv variant, finds the surface_force_max of the 
+						current O estimate, then sums the maximas in free energy 
+						differences in each period and also gets a vector of these, 
+						then loop, and if summed_max becomes  larger than summed_f_m, 
+						then  break if the new summed_max energetically favourable, 
+						keep it, otherwhise revert to the old O estimate, when loop is 
+						done, return standard LR_deconv stuff ~~ again, the 
+						surface_force_max variable rather seems to be a free energy 
+						maximum than a force maximum, also the the meaning of the 
+						summed_max - summed_f_m cut off somewhat eludes me atm
+
+
+
+##############
+### run .c ###
+##############
+
+** Description ** 
+
+
+
+** List of variables **
+
+traces					supposedly this variable determins the number of runs in the 
+						forwards and background directions. while this seems to be 
+						true, the variable definition in the fie is moot, since 
+						get_args later overwrites it with whatever is provided from
+						lucy_comparisons.py.
+
+
+
+** List of functions **
+
+main loop				This loop calculates the positions of a test particle going 
+						through a tomlinson potetnial with random kicks at every time
+						step.
+
+
+###################
+### functions.c ###
+###################
+
+** Description ** 
+
+This is where the majority of the functions are defined out of line, the in line definition is in headers.h.
+
+** List of variables **
+
+lambda					support position
+prot					vector of all support positions
+T_final					simulation time
+h						timestep
+z_final					final position?
+
+** List of functions ** 
+
+calculate_lambda:		calculates lambda, which is the reaction coeficient in the 
+						lingo of Johan's thesis, which the support position
+make_protocol:			this function creats a vector "prot" with all support 
+						positions, which is the "protocol", just linear displacement
+force					this gives the Tomlin force
+
+
+#################
+### headers.h ###
+#################
+
+** Description ** 
+
+This is where the functions are defined, but they are all mostely out of line definitions given in functions.h
+
+** List of variables **
+
+protocol_constant		hmm...?
+sigma					this seems to be the lattice parameter
+epsilon					is the absolute temperature (k_B * T)
+sigma_d					is one, and is stupid
+epsilon_d				is one and is as stpupid
+protocol_function		seems to be a "chooser" for which protocol to use, hard coded
+						in run.c.
+
+** List of functions **
+
+MAKE_PROTOCOL			creates the vector prot in a similar fashion to make_protocol
+						from functuons.c, but also takes samples at regular intervals.
+
+
+
+
+
+
+
+
+
+
+
+
+
